@@ -201,3 +201,22 @@ effort_summaries$abundance_effort
 effort_summaries$abundance_dataset_summary
 effort_summaries$size_effort
 effort_summaries$size_dataset_summary
+
+# yearly effort # 
+fish_long %>% distinct (site, pair, type, Date, survey_id) %>% 
+  mutate(year=format(Date, "%Y")) %>% 
+  count(year, type, name= "n_surveys") %>% 
+  pivot_wider(names_from=type, values_from = n_surveys, values_fill = 0)
+
+# site effort # 
+fish_long %>%
+  distinct(site, pair, type, Date, survey_id) %>%
+  filter(format(Date, "%Y") == "2025") %>%
+  count(pair, type, name = "n_surveys") %>%
+  tidyr::pivot_wider(
+    names_from = type,
+    values_from = n_surveys,
+    values_fill = 0
+  )
+
+

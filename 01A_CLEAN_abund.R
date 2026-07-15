@@ -188,3 +188,18 @@ fish_counts <- fish_long %>%
   group_by(site, pair, type, period, t_since, date_num, Date, date_s,
            survey_id, feeding_guild) %>%
   summarise(Count = sum(Count, na.rm = TRUE), .groups = "drop")
+
+# total fish before cleaning 
+# abundance_raw %>%
+#   summarise(total_fish = sum(total_N, na.rm = TRUE))
+# and after 
+fish_long %>%
+  summarise(total_fish = sum(Count, na.rm = TRUE)) 
+
+# observation hours 
+fish_long %>%
+  distinct(survey_id) %>%
+  summarise(
+    n_surveys = n(),
+    observation_hours = n_surveys * 8 / 60
+  )

@@ -60,19 +60,25 @@ suppressPackageStartupMessages({
 
 
 #### 3. Project paths ####
+#### 3. Project paths ####
 
-# Use here::here() so scripts work from the project root.
 project_dir <- here::here()
 
 data_raw_dir       <- here::here("data", "raw")
 data_interim_dir   <- here::here("data", "interim")
 data_processed_dir <- here::here("data", "processed")
 
-outputs_dir     <- here::here("outputs")
-figures_dir     <- here::here("outputs", "figures")
-tables_dir      <- here::here("outputs", "tables")
-models_dir      <- here::here("outputs", "model_objects")
-diagnostics_dir <- here::here("outputs", "diagnostics")
+# Create a new dated analysis folder for each analysis version.
+outputs_root_dir <- here::here("outputs")
+outputs_dir <- file.path(
+  outputs_root_dir,
+  paste0("Analysis_", analysis_date)
+)
+
+figures_dir     <- file.path(outputs_dir, "figures")
+tables_dir      <- file.path(outputs_dir, "tables")
+models_dir      <- file.path(outputs_dir, "model_objects")
+diagnostics_dir <- file.path(outputs_dir, "diagnostics")
 
 docs_dir <- here::here("docs")
 
@@ -80,14 +86,15 @@ dir.create(data_raw_dir,       recursive = TRUE, showWarnings = FALSE)
 dir.create(data_interim_dir,   recursive = TRUE, showWarnings = FALSE)
 dir.create(data_processed_dir, recursive = TRUE, showWarnings = FALSE)
 
-dir.create(outputs_dir,     recursive = TRUE, showWarnings = FALSE)
-dir.create(figures_dir,     recursive = TRUE, showWarnings = FALSE)
-dir.create(tables_dir,      recursive = TRUE, showWarnings = FALSE)
-dir.create(models_dir,      recursive = TRUE, showWarnings = FALSE)
-dir.create(diagnostics_dir, recursive = TRUE, showWarnings = FALSE)
-dir.create(docs_dir,        recursive = TRUE, showWarnings = FALSE)
+dir.create(outputs_root_dir, recursive = TRUE, showWarnings = FALSE)
+dir.create(outputs_dir,      recursive = TRUE, showWarnings = FALSE)
+dir.create(figures_dir,      recursive = TRUE, showWarnings = FALSE)
+dir.create(tables_dir,       recursive = TRUE, showWarnings = FALSE)
+dir.create(models_dir,       recursive = TRUE, showWarnings = FALSE)
+dir.create(diagnostics_dir,  recursive = TRUE, showWarnings = FALSE)
+dir.create(docs_dir,         recursive = TRUE, showWarnings = FALSE)
 
-
+message("Outputs will be saved to: ", outputs_dir)
 #### 4. Raw data file paths ####
 abundance_raw_path <- file.path(
   data_raw_dir,

@@ -1,0 +1,160 @@
+LOG 
+
+502PM ABUNDANCE RESULTS FRAMEWORK
+
+* Reframed abundance results around ecological questions rather than model coefficients.
+* Result hierarchy:
+  1. Overall artificial vs natural trajectories.
+  2. Artificial and natural trajectories within each site pair.
+  3. Artificial-natural trajectory differences within each pair (redistribution test).
+  4. Combined paired abundance through time (production test).
+  5. Feeding-guild decomposition.
+* Use emmeans throughout for all temporal slopes and contrasts.
+* Paired abundance change estimated from response-scale marginal means (no custom simulations).
+* Treat overall, pair, paired-total and guild analyses as separate hypothesis families for multiplicity correction.
+
+416PM BRAIN DEAD 
+* had a whole hour long freakout over model selection and fixed effects and interactions
+* ended up at the exact same place lol 
+* working on extracting results for abundance model now 
+
+250PM ABUNDANCE MODEL CHOICE
+
+* Returned to the full guild × reef type × pair × time interaction model.
+* Better fit than design-based model (ΔAIC ≈ 438; LRT p < 0.001).
+* Diagnostics substantially improved:
+  - dispersion acceptable
+  - no zero inflation issues
+  - outliers acceptable
+* Design-based model oversimplified feeding-guild responses and fit poorly.
+* Reviewer concern about "period" addressed by interpreting temporal slopes rather than deployment coefficients.
+
+220PM ABUNDANCE FIGURE 3
+
+* Original discrepancy traced to data processing rather than model.
+* Butterflyfish reassigned from Herbivore to Invertivore.
+* Observer averaging also reduced total herbivore counts.
+* Original high herbivore trajectories were largely an artefact of butterflyfish classification plus non-averaged counts.
+* Prediction plots should hold period constant ("Post") rather than introducing deployment jumps.
+* Plot predictions now match intended biological interpretation.
+
+200PM ABUNDANCE INTERPRETATION
+
+* Main ecological question clarified:
+  attraction (redistribution) versus production.
+* Artificial reefs increasing alone is insufficient evidence of production.
+* Key evidence sequence:
+  - artificial trajectory
+  - natural trajectory
+  - artificial-natural divergence
+  - paired total abundance
+  - juvenile and size analyses
+* Size structure and juveniles become the critical evidence for production rather than abundance alone.
+
+145PM ABUNDANCE RESULTS
+
+* Artificial reefs increased overall whereas natural reefs remained stable.
+* Overall artificial trajectories more positive than natural reefs.
+* Only Aow Mao showed significant artificial-natural trajectory divergence.
+* No Name and Sattakut showed no significant reef-specific divergence.
+* Combined paired abundance:
+  - Aow Mao stable
+  - No Name declined before multiplicity correction (adjusted p ≈ 0.057)
+  - Sattakut stable
+* Guild differences at Aow Mao driven primarily by mesopredators and HTLP.
+
+133PM A NOTE ON ABUNDANCE AND TOTAL COUNTS 
+* formally tested in 2.8
+* can maybe add to fig3 as a seperate panel 
+* nb1 was fine, no zi 
+
+
+126PM DIVERSITY WRAP 
+* deployment step strongly supported
+* step differs between artificial and natural reefs
+* type-specific residual variance supported
+* final diagnostics acceptable
+* no residual temporal autocorrelation after BH correction
+
+120PM DIVERSITY 
+* Fixed-effect structure is strongly supported:
+* Adding period improves fit.
+* Allowing deployment step to differ by reef type improves fit again.
+* No residual temporal autocorrelation remains after BH correction.
+* VIF warning mainly reflects interaction coding, not a reason to remove terms.
+But Gaussian LM is not adequate yet:
+* residuals non-normal
+*  strong heteroscedasticity
+
+
+105PM 
+ABUNDANCE DECISIONS
+* Modelled feeding-guild counts per survey.
+* Full guild × reef type × pair × time interaction retained.
+* Constant-ZI nbinom2 GLMM selected.
+* Survey ID included as random intercept.
+* Interpret with temporal slopes and artificial–natural contrasts.
+* Diagnostics passed; limited residual autocorrelation remains.
+* Visibility did not explain autocorrelation.
+* GAMM not better 
+==> Abundance complete; move to Shannon diversity.
+
+
+1215 MODEL FITS FOR ABUNDANCE 
+* nbinom1 fails badly on dispersion.
+* nbinom2 fits dispersion well but underpredicts zeros.
+* The zero-inflated nbinom2 resolves dispersion, zero inflation, and outliers.
+* Its AIC improves by 58 points.
+* The GAMM predicts 16.6% worse than the GLMM.
+* Full feeding_guild × type × pair × date_s structure strongly supported.
+* Residual autocorrelation remains in 4 of 24 series, unrelated to visibility.
+==> Final model: constant-ZI nbinom2 GLMM with full interaction and survey random intercept.
+
+The feeding-guild abundance model is now settled:
+zero-inflated nbinom2 GLMM retained
+GAMM rejected on worse holdout prediction
+diagnostics passed after zero-inflation adjustment
+residual autocorrelation remained in three isolated series
+visibility showed no consistent alignment with those residual patterns
+no additional temporal or visibility structure added
+
+1148AM GAMM vs GLMM 
+The GAMM performed worse on the temporal holdout:
+* GLMM test log-RMSE: 0.843
+* GAMM test log-RMSE: 0.980
+* GAMM change relative to GLMM: 16.2% worse
+====> no predictive justification for the added nonlinear complexity.
+
+
+
+1120AM PLAN FOR MODELS 
+Four models only
+* Feeding-guild temporal trajectories
+* Shannon diversity trajectories
+* Community-level juvenile/adult patterns 
+* Target-taxa juvenile/adult patterns
+For each model
+* Fit one biologically justified primary structure
+* Run diagnostics
+* Modify only if diagnostics show a genuine problem
+* Report only the estimates and contrasts needed for the Results question
+Sensitivity analyses
+* Only in exceptional cases, such as:
+** One verified extreme survey materially changes the conclusion
+** The selected distribution clearly fails diagnostics
+** A reviewer has specifically requested an alternative model
+
+Otherwise, no routine alternative formulations, no model suite, and no supplementary analysis dump.
+The goal is not to prove every conceivable modelling choice. It is to present four transparent, defensible models that answer the five-section Results skeleton without creating new storylines.
+
+1108AM AFTER EXPLORING THE DATA: 
+* broad conclusion is good: the data support negative-binomial modelling, zero inflation is not obviously required, fixed-effect collinearity is manageable, but variance structure and sparse pre-deployment support require conservative model specification.
+* PLAN: Fit both nbinom1 and nbinom2, then run DHARMa diagnostics including dispersion, zero inflation, temporal autocorrelation, and residual patterns by pair and reef type.
+* The main exploration conclusions are already clear:
+    * Negative binomial is justified.
+    * Zero inflation is not obviously required.
+    * date_s and t_since cannot be used together.
+    * Fixed-effect collinearity is otherwise acceptable.
+    * Pre-deployment replication is weak, so interactions must remain limited.
+    * Extreme surveys are real ecological events.
+    * Variance heterogeneity must be assessed formally after fitting.

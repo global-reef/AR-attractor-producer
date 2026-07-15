@@ -258,3 +258,6 @@ clean_size_data <- function(file_path) {
 fish_size <- clean_size_data(size_raw_path)
 
 str(fish_size)
+# and after 
+fish_size %>%
+  summarise(total_fish = sum(Count, na.rm = TRUE)) 

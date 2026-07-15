@@ -1,0 +1,18 @@
+LOG 
+
+1205pm STARTING JUVENILE ENRICHMENT 3.4
+* Main decision- pooled community model or species standardised. 
+* Pooled community model : what proportion of all fish observed on each survey were juveniles? (Could obscure trend because ONE really abundant species is mostly juveniles)
+* Species Standardised: Within species, are fish more likely to be juvenile on ARs than NRs? (Almost like weighting)
+* Probably more robust to go option 2 - possible formulation: 
+    ** juvenile_prop ~ type * date_s + pair + (1 | Species) + (1 | survey_id)
+* 
+
+1025AM DIVERSITY RESULTS AND PLOTTING 
+* ok diversity done 
+* Final diversity model retained overall reef-type trajectories, with pair treated as an adjustment factor.
+* Shannon diversity increased significantly through time on both artificial and natural reefs.
+* Artificial reefs increased numerically faster, but the temporal slopes did not differ significantly.
+* The increase from before to after deployment was significantly greater on artificial reefs.
+* Artificial reefs initially had significantly lower diversity than natural reefs, but this difference was smaller and non-significant by the end of the study.
+* Pattern suggests possible convergence, although convergence was not statistically supported.
