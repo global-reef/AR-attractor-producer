@@ -1,11 +1,39 @@
 LOG 
+350PM I THINK IM DONE 3.4
+* ditched beta-binom proportions, back to count model
+* final: life_stage * type * pair + species RE + survey RE
+* rebuilt zeros properly; no date, no inclusion offset
+* no species random slopes, too far from nursery question
+* juvs > adults overall, but no sig AR vs NR count diffs
+* no sig AR vs NR juvenile proportion diffs; ARs just more variable
+* need to still ****plot it*** but i've number dumped into results 
+
+
+312PM JUST KIDDING 
+* actually we're doing a count model fuck it 
+* but the diagnostics are not good 
+* so now we've got a crazy amount of random sloping happening 
+* and we're back to like barely any significance
+
+220PM JUVENILE PROPORTION RESULTS 
+* nothing is significant :) 
+* fuck
+* high proportions of juveniles on both wrecks and natural reefs, but no difference between the two. if anything, lower juveniles on wrecks. 
+* well shit 
+
+
+139PM JUVENILE MODELS 
+* went with species-standarised beta binomial GLMM of juv vs adults 
+* site REs replaced with REs for species and survey 
+* beta-binom strongly outperformed binomial
+
 
 1205pm STARTING JUVENILE ENRICHMENT 3.4
 * Main decision- pooled community model or species standardised. 
 * Pooled community model : what proportion of all fish observed on each survey were juveniles? (Could obscure trend because ONE really abundant species is mostly juveniles)
 * Species Standardised: Within species, are fish more likely to be juvenile on ARs than NRs? (Almost like weighting)
 * Probably more robust to go option 2 - possible formulation: 
-    ** juvenile_prop ~ type * date_s + pair + (1 | Species) + (1 | survey_id)
+    ** cbind(juv, adult) ~ type * pair + date_s + (1 | Species) + (1 | survey_id)
 * 
 
 1025AM DIVERSITY RESULTS AND PLOTTING 
