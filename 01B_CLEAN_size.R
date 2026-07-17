@@ -6,7 +6,6 @@ library(stringr)
 library(tibble)
 
 clean_size_data <- function(file_path) {
-  
   ## Load raw data ##
   raw_fish <- read.csv(file_path, stringsAsFactors = TRUE, strip.white = TRUE)
   
@@ -140,6 +139,7 @@ clean_size_data <- function(file_path) {
   fish_size <- fish_size %>%
     mutate(
       Sci_Name = case_when(
+        Sci_Name == "Lutjanus griseus" ~ "Lutjanus argentimaculatus",
         Sci_Name == "Carangoides bajad" ~ "Flavocaranx bajad",
         Sci_Name == "Carangoides fulvoguttatus" ~ "Turrum fulvoguttatum",
         Sci_Name == "Neopomacentrus cyanos" ~ "Neopomacentrus cyanomos",
@@ -260,4 +260,9 @@ fish_size <- clean_size_data(size_raw_path)
 str(fish_size)
 # and after 
 fish_size %>%
+  mutate(Species = factor(Species)) %>% 
   summarise(total_fish = sum(Count, na.rm = TRUE)) 
+
+names(fish_size)
+unique(fish_size$Species)
+unique(fish_size$sci_name)

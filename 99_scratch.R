@@ -1,561 +1,562 @@
-#### 3. Shannon diversity trajectories ####
+library(dplyr)
+library(tidyr)
+library(glmmTMB)
+library(DHARMa)
+library(emmeans)
+library(performance)
 
-community_wide <- fish_long %>%
-  select(
-    survey_id, site, pair, type, period,
-    Date, date_s, Species, Count
-  ) %>%
-  pivot_wider(
-    names_from = Species,
-    values_from = Count,
-    values_fill = 0
-  )
-
-species_columns <- setdiff(
-  names(community_wide),
-  c(
-    "survey_id", "site", "pair", "type",
-    "period", "Date", "date_s"
-  )
+focal_taxa <- c(
+  "Damsels - Regal Demoiselle",
+  "Damsels - Alexanders",
+  "Snapper - Russells",
+  "Snapper - Brownstripe",
+  "Snapper - Mangrove"
 )
 
-shannon_data <- community_wide %>%
-  mutate(
-    shannon = vegan::diversity(
-      as.matrix(pick(all_of(species_columns))),
-      index = "shannon"
-    )
-  ) %>%
-  select(
-    survey_id, site, pair, type,
-    period, Date, date_s, shannon
-  )
-
-shannon_model <- lmer(
-  shannon ~ type * (date_s + period) +
-    (1 + date_s || site),
-  data = shannon_data
-)
-
-cat("\n### Shannon diversity model ###\n")
-print(summary(shannon_model))
-print(performance::check_collinearity(shannon_model))
-print(performance::check_singularity(shannon_model))
-plot(performance::check_model(shannon_model))
-
-
-#### 4. Community juvenile-adult patterns ####
-
-size_dates <- fish_size %>%
-  distinct(survey_id, Date) %>%
-  mutate(
-    date_num = as.numeric(Date - min(Date)),
-    date_s = as.numeric(scale(date_num))
-  )
-
-community_stage_data <- fish_size %>%
+# aggregate 
+stage_observed <- fish_size %>%
+  filter(Species %in% focal_taxa) %>%
   group_by(
-    survey_id, site, pair, type,
-    Date, life_stage
+    survey_id, site, pair, type, Date,
+    Species, Sci_Name, life_stage
   ) %>%
   summarise(
-    Count = sum(stage_Count),
+    stage_count = sum(stage_Count),
     .groups = "drop"
+  )
+stage_observed %>%
+  summarise(
+    n_noninteger = sum(stage_count %% 1 != 0),
+    n_negative = sum(stage_count < 0),
+    total = sum(stage_count)
+  )
+
+# restore structure 
+survey_key <- fish_size %>%
+  distinct(survey_id, site, pair, type, Date)
+
+species_key <- fish_size %>%
+  filter(Species %in% focal_taxa) %>%
+  distinct(Species, Sci_Name)
+
+focal_stage <- survey_key %>%
+  crossing(
+    species_key,
+    life_stage = factor(
+      c("juvenile", "adult"),
+      levels = c("juvenile", "adult")
+    )
   ) %>%
-  complete(
-    nesting(survey_id, site, pair, type, Date),
-    life_stage,
-    fill = list(Count = 0)
+  left_join(
+    stage_observed,
+    by = c(
+      "survey_id", "site", "pair", "type", "Date",
+      "Species", "Sci_Name", "life_stage"
+    )
   ) %>%
-  left_join(size_dates, by = c("survey_id", "Date"))
+  mutate(
+    stage_count = replace_na(stage_count, 0),
+    stage_count = as.integer(stage_count),
+    Species = factor(Species, levels = focal_taxa),
+    pair = droplevels(pair),
+    type = factor(type, levels = c("Natural", "Artificial")),
+    life_stage = factor(
+      life_stage,
+      levels = c("adult", "juvenile")
+    )
+  )
 
-community_stage_model <- glmmTMB(
-  Count ~ life_stage * type * pair +
-    date_s +
-    (1 | survey_id),
-  family = nbinom2,
-  data = community_stage_data
-)
+focal_summary <- focal_stage %>%
+  group_by(Species) %>%
+  summarise(
+    total_count = sum(stage_count),
+    juvenile_count = sum(stage_count[life_stage == "juvenile"]),
+    adult_count = sum(stage_count[life_stage == "adult"]),
+    juvenile_surveys = sum(
+      life_stage == "juvenile" & stage_count > 0
+    ),
+    adult_surveys = sum(
+      life_stage == "adult" & stage_count > 0
+    ),
+    surveys_present = n_distinct(survey_id[stage_count > 0]),
+    zero_pct = mean(stage_count == 0) * 100,
+    .groups = "drop"
+  )
 
-cat("\n### Community juvenile-adult model ###\n")
-print(summary(community_stage_model))
-community_stage_residuals <- check_glmm(
-  community_stage_model,
-  community_stage_data,
-  time = community_stage_data$date_num,
-  group = community_stage_data$survey_id
-)
+focal_summary
+
+focal_cells <- focal_stage %>%
+  group_by(Species, pair, type, life_stage) %>%
+  summarise(
+    total_count = sum(stage_count),
+    positive_surveys = sum(stage_count > 0),
+    mean_count = mean(stage_count),
+    maximum_count = max(stage_count),
+    .groups = "drop"
+  )
+
+focal_cells
 
 
-#### 5. Target-taxa juvenile-adult patterns ####
 
-missing_target_taxa <- setdiff(
-  target_taxa,
-  unique(as.character(fish_size$Species))
-)
+library(dplyr)
+library(purrr)
+library(tidyr)
+library(glmmTMB)
+library(DHARMa)
+library(broom.mixed)
 
-if (length(missing_target_taxa) > 0) {
-  warning(
-    "Target taxa absent from fish_size: ",
-    paste(missing_target_taxa, collapse = ", "),
-    call. = FALSE
+species_data <- focal_stage %>%
+  mutate(
+    Species = droplevels(Species),
+    life_stage = factor(life_stage, levels = c("adult", "juvenile")),
+    type = factor(type, levels = c("Natural", "Artificial")),
+    pair = factor(pair)
+  ) %>%
+  group_split(Species) %>%
+  set_names(map_chr(., ~ as.character(unique(.x$Species))))
+
+fit_species_model <- function(dat) {
+  glmmTMB(
+    stage_count ~ life_stage * type * pair + (1 | survey_id),
+    family = nbinom2,
+    data = dat
   )
 }
 
-target_stage_data <- fish_size %>%
-  filter(Species %in% target_taxa) %>%
-  group_by(
-    survey_id, site, pair, type,
-    Date, Species, life_stage
-  ) %>%
-  summarise(
-    Count = sum(stage_Count),
-    .groups = "drop"
-  ) %>%
-  complete(
-    nesting(survey_id, site, pair, type, Date),
-    Species,
-    life_stage,
-    fill = list(Count = 0)
-  ) %>%
-  left_join(size_dates, by = c("survey_id", "Date")) %>%
-  mutate(
-    Species = droplevels(factor(Species)),
-    survey_taxon_id = interaction(
-      survey_id, Species,
-      drop = TRUE
+species_models <- map(species_data, fit_species_model)
+
+fit_species_model <- function(dat) {
+  glmmTMB(
+    stage_count ~ life_stage * type * pair + (1 | survey_id),
+    family = nbinom2,
+    data = dat,
+    control = glmmTMBControl(
+      optimizer = optim,
+      optArgs = list(method = "BFGS")
     )
   )
+}
 
-target_stage_model <- glmmTMB(
-  Count ~ Species * life_stage * type +
-    pair + date_s +
-    (1 | survey_taxon_id),
-  family = nbinom2,
-  data = target_stage_data
+species_models_bfgs <- map(species_data, fit_species_model)
+model_checks_bfgs <- imap_dfr(
+  species_models_bfgs,
+  \(mod, spp) tibble(
+    Species = spp,
+    convergence_code = mod$fit$convergence,
+    convergence_message = mod$fit$message,
+    positive_definite_hessian = mod$sdr$pdHess,
+    singular = performance::check_singularity(mod)
+  )
 )
 
-cat("\n### Target-taxa juvenile-adult model ###\n")
-print(summary(target_stage_model))
-target_stage_residuals <- check_glmm(
-  target_stage_model,
-  target_stage_data,
-  time = target_stage_data$date_num,
-  group = target_stage_data$survey_id
+model_checks_bfgs
+
+
+model_checks <- imap_dfr(
+  species_models,
+  \(mod, spp) tibble(
+    Species = spp,
+    convergence_code = mod$fit$convergence,
+    convergence_message = mod$fit$message,
+    positive_definite_hessian = mod$sdr$pdHess,
+    singular = performance::check_singularity(mod)
+  )
 )
 
+model_checks
 
-#### 6. Essential model estimates ####
-
-abundance_slopes <- emtrends(
-  abundance_final,
-  ~ feeding_guild * type | pair,
-  var = "date_s"
+model_parameters <- imap_dfr(
+  species_models,
+  \(mod, spp) {
+    vc <- VarCorr(mod)$cond$survey_id
+    
+    tibble(
+      Species = spp,
+      survey_sd = attr(vc, "stddev"),
+      dispersion = sigma(mod)
+    )
+  }
 )
 
-shannon_slopes <- emtrends(
-  shannon_model,
-  ~ type,
-  var = "date_s"
-)
+model_parameters
 
-community_stage_contrasts <- emmeans(
-  community_stage_model,
-  ~ life_stage * type | pair,
-  type = "response"
-)
+set.seed(123)
 
-target_stage_contrasts <- emmeans(
-  target_stage_model,
-  ~ life_stage * type | Species,
-  type = "response"
-)
-
-cat("\n### Abundance temporal slopes ###\n")
-print(abundance_slopes)
-
-cat("\n### Shannon temporal slopes ###\n")
-print(shannon_slopes)
-
-cat("\n### Community juvenile-adult estimates ###\n")
-print(community_stage_contrasts)
-
-cat("\n### Target-taxa juvenile-adult estimates ###\n")
-print(target_stage_contrasts)
-
-
-#### 7. Save final model objects only ####
-
-saveRDS(
-  abundance_final,
-  file.path(models_dir, paste0("abundance_final_", analysis_date, ".rds"))
-)
-
-saveRDS(
-  shannon_model,
-  file.path(models_dir, paste0("shannon_final_", analysis_date, ".rds"))
-)
-
-saveRDS(
-  community_stage_model,
-  file.path(models_dir, paste0("community_stage_final_", analysis_date, ".rds"))
-)
-
-saveRDS(
-  target_stage_model,
-  file.path(models_dir, paste0("target_stage_final_", analysis_date, ".rds"))
-)
-
-message("Four final model objects saved.")
-
-
-
-
-
-
-
-
-
-
-#### trying juvenile modelling 3.4 #### 
-
-## 4. Species-standardised life-stage abundance ####
-
-juvenile_results <- local({
-  
-  #### 4.1 Analysis data ####
-  
-  survey_frame <- fish_size %>%
-    distinct(survey_id, site, pair, type, Date)
-  
-  species_frame <- fish_size %>%
-    distinct(Species)
-  
-  stage_counts <- fish_size %>%
-    group_by(
-      survey_id, site, pair, type, Date,
-      Species, life_stage) %>%
-    summarise(
-      stage_count = sum(stage_Count),
-      .groups = "drop")
-  
-  juvenile_data <- tidyr::crossing(
-    survey_frame,
-    species_frame,
-    life_stage = c("juvenile", "adult")) %>%
-    left_join(
-      stage_counts,
-      by = c(
-        "survey_id", "site", "pair", "type", "Date",
-        "Species", "life_stage")) %>%
-    mutate(
-      stage_count = as.integer(replace_na(stage_count, 0)),
-      life_stage = factor(
-        life_stage,
-        levels = c("juvenile", "adult")),
-      type = factor(
-        type,
-        levels = c("Natural", "Artificial")),
-      pair = factor(pair),
-      Species = factor(Species),
-      survey_id = factor(survey_id))
-  
-  cat("\n### Life-stage count summary ###\n")
-  juvenile_data %>%
-    summarise(
-      n_rows = n(),
-      n_surveys = n_distinct(survey_id),
-      n_species = n_distinct(Species),
-      n_zero = sum(stage_count == 0),
-      zero_proportion = mean(stage_count == 0),
-      total_juveniles = sum(
-        stage_count[life_stage == "juvenile"]),
-      total_adults = sum(
-        stage_count[life_stage == "adult"])) %>%
-    print()
-  
-  
-  #### 4.2 Distribution comparison ####
-  
-  poisson_model <- glmmTMB(
-    stage_count ~ life_stage * type * pair +
-      (1 | Species) + (1 | survey_id),
-    family = poisson,
-    data = juvenile_data)
-  
-  nbinom1_model <- update(
-    poisson_model,
-    family = nbinom1)
-  
-  nbinom2_model <- update(
-    poisson_model,
-    family = nbinom2)
-  
-  distribution_comparison <- AIC(
-    poisson_model,
-    nbinom1_model,
-    nbinom2_model)
-  
-  cat("\n### Distribution comparison ###\n")
-  print(distribution_comparison)
-  
-  
-  #### 4.3 Primary conditional model ####
-  
-  # Fixed a priori from the ecological question:
-  # Do juvenile and adult counts differ between ARs and NRs,
-  # and does that pattern vary among site pairs?
-  #
-  # Species is included as a random intercept to control for
-  # baseline abundance differences among taxa.
-  # Survey is included for repeated species-stage observations.
-  
-  conditional_model <- nbinom2_model
-  
-  
-  #### 4.4 Dispersion and zero-inflation structure ####
-  
-  candidate_models <- list(
-    constant = conditional_model,
-    dispersion_type = update(
-      conditional_model,
-      dispformula = ~type),
-    dispersion_pair = update(
-      conditional_model,
-      dispformula = ~pair),
-    dispersion_type_pair = update(
-      conditional_model,
-      dispformula = ~type * pair),
-    zero_inflated = update(
-      conditional_model,
-      ziformula = ~1),
-    zero_inflated_type = update(
-      conditional_model,
-      ziformula = ~type))
-  
-  candidate_comparison <- bind_rows(
-    lapply(names(candidate_models), function(x) {
-      tibble(
-        model = x,
-        df = attr(
-          logLik(candidate_models[[x]]),
-          "df"),
-        AIC = AIC(candidate_models[[x]]))
-    })) %>%
-    arrange(AIC)
-  
-  cat("\n### Dispersion and zero-inflation comparison ###\n")
-  print(candidate_comparison)
-  
-  # Retain the best-supported nuisance variance structure,
-  # provided the model converges and residual diagnostics pass.
-  
-  juvenile_final <- candidate_models$dispersion_type
-  
-  
-  #### 4.5 Final-model diagnostics ####
-  
-  final_residuals <- DHARMa::simulateResiduals(
-    juvenile_final,
+species_dharma <- map(
+  species_models,
+  ~ simulateResiduals(
+    fittedModel = .x,
     n = 1000,
-    plot = FALSE)
+    plot = FALSE
+  )
+)
+dharma_checks <- imap_dfr(
+  species_dharma,
+  \(res, spp) {
+    uniformity <- testUniformity(res, plot = FALSE)
+    dispersion <- testDispersion(res, plot = FALSE)
+    zero_inflation <- testZeroInflation(res, plot = FALSE)
+    outliers <- testOutliers(res, plot = FALSE)
+    
+    tibble(
+      Species = spp,
+      uniformity_p = uniformity$p.value,
+      dispersion_p = dispersion$p.value,
+      zero_inflation_p = zero_inflation$p.value,
+      outlier_p = outliers$p.value
+    )
+  }
+)
+
+dharma_checks
+
+species_model_summary <- model_checks %>%
+  left_join(model_parameters, by = "Species") %>%
+  left_join(dharma_checks, by = "Species")
+
+species_model_summary
+
+### for results 
+extract_species_results <- function(models, adjust = "holm") {
   
-  diagnostic_tests <- list(
-    uniformity = DHARMa::testUniformity(
-      final_residuals),
-    dispersion = DHARMa::testDispersion(
-      final_residuals),
-    outliers = DHARMa::testOutliers(
-      final_residuals,
-      type = "bootstrap"),
-    zero_inflation = DHARMa::testZeroInflation(
-      final_residuals))
+  ## Omnibus Type III tests
+  omnibus <- purrr::imap_dfr(
+    models,
+    \(mod, spp) {
+      car::Anova(mod, type = 3) %>%
+        as.data.frame() %>%
+        tibble::rownames_to_column("term") %>%
+        transmute(
+          Species = spp,
+          term,
+          chisq = Chisq,
+          df = Df,
+          p_value = `Pr(>Chisq)`,
+          significance = if_else(
+            p_value < 0.05,
+            "Significant",
+            "Non-significant"
+          )
+        )
+    }
+  )
   
-  cat("\n### Final life-stage model diagnostics ###\n")
-  print(diagnostic_tests$uniformity)
-  print(diagnostic_tests$dispersion)
-  print(diagnostic_tests$outliers)
-  print(diagnostic_tests$zero_inflation)
+  ## Estimated counts for every stage × type × pair combination
+  emm <- purrr::map(
+    models,
+    ~ emmeans::emmeans(
+      .x,
+      ~ life_stage * type * pair
+    )
+  )
   
+  predicted_counts <- purrr::imap_dfr(
+    emm,
+    \(x, spp) {
+      summary(
+        x,
+        type = "response",
+        infer = c(TRUE, TRUE)
+      ) %>%
+        as.data.frame() %>%
+        mutate(Species = spp, .before = 1)
+    }
+  )
   
-  #### 4.6 Omnibus tests ####
+  ## Artificial versus natural within each life stage and pair
+  reef_contrasts <- purrr::imap_dfr(
+    emm,
+    \(x, spp) {
+      emmeans::contrast(
+        x,
+        method = "revpairwise",
+        by = c("life_stage", "pair"),
+        adjust = adjust
+      ) %>%
+        summary(
+          type = "response",
+          infer = c(TRUE, TRUE)
+        ) %>%
+        as.data.frame() %>%
+        mutate(
+          Species = spp,
+          significance = if_else(
+            p.value < 0.05,
+            "Significant",
+            "Non-significant"
+          ),
+          .before = 1
+        )
+    }
+  )
   
-  stage_tests <- emmeans::joint_tests(
-    juvenile_final)
+  ## Juvenile versus adult within each reef type and pair
+  stage_contrasts <- purrr::imap_dfr(
+    emm,
+    \(x, spp) {
+      emmeans::contrast(
+        x,
+        method = "revpairwise",
+        by = c("type", "pair"),
+        adjust = adjust
+      ) %>%
+        summary(
+          type = "response",
+          infer = c(TRUE, TRUE)
+        ) %>%
+        as.data.frame() %>%
+        mutate(
+          Species = spp,
+          significance = if_else(
+            p.value < 0.05,
+            "Significant",
+            "Non-significant"
+          ),
+          .before = 1
+        )
+    }
+  )
   
-  cat("\n### Omnibus fixed-effect tests ###\n")
-  print(stage_tests)
+  ## Difference in juvenile-to-adult composition between reef types
+  composition_contrasts <- purrr::imap_dfr(
+    emm,
+    \(x, spp) {
+      emmeans::contrast(
+        x,
+        interaction = c("revpairwise", "revpairwise"),
+        by = "pair",
+        adjust = adjust
+      ) %>%
+        summary(
+          type = "response",
+          infer = c(TRUE, TRUE)
+        ) %>%
+        as.data.frame() %>%
+        mutate(
+          Species = spp,
+          significance = if_else(
+            p.value < 0.05,
+            "Significant",
+            "Non-significant"
+          ),
+          .before = 1
+        )
+    }
+  )
   
+  ## Derived juvenile proportions from predicted stage counts
+  response_col <- intersect(
+    c("response", "rate", "prob", "emmean"),
+    names(predicted_counts)
+  )[1]
   
-  #### 4.7 Predicted counts and derived proportions ####
+  if (is.na(response_col)) {
+    stop("Could not identify the predicted-response column.")
+  }
   
-  stage_emm <- emmeans::emmeans(
-    juvenile_final,
-    ~life_stage | type * pair,
-    type = "response")
-  
-  stage_predictions <- summary(
-    stage_emm,
-    infer = c(TRUE, TRUE),
-    adjust = "none") %>%
-    as_tibble()
-  
-  stage_proportions <- stage_predictions %>%
+  juvenile_proportions <- predicted_counts %>%
     select(
-      type, pair, life_stage, response) %>%
+      Species, life_stage, type, pair,
+      predicted_count = all_of(response_col)
+    ) %>%
     pivot_wider(
       names_from = life_stage,
-      values_from = response) %>%
+      values_from = predicted_count
+    ) %>%
     mutate(
-      total = juvenile + adult,
-      juvenile_prop = juvenile / total,
-      adult_prop = adult / total)
-  
-  cat("\n### Predicted stage counts ###\n")
-  print(stage_predictions)
-  
-  cat("\n### Derived life-stage proportions ###\n")
-  print(stage_proportions)
-  
-  
-  #### 4.8 Artificial versus natural contrasts ####
-  
-  reef_emm <- emmeans::emmeans(
-    juvenile_final,
-    ~type | life_stage * pair,
-    type = "response")
-  
-  stage_contrasts <- emmeans::contrast(
-    reef_emm,
-    method = list(
-      "Artificial / Natural" = c(-1, 1)),
-    by = c("life_stage", "pair")) %>%
-    summary(
-      infer = c(TRUE, TRUE),
-      adjust = "none") %>%
-    as_tibble()
-  
-  cat("\n### Artificial versus natural counts ###\n")
-  print(stage_contrasts)
-  
-  
-  #### 4.9 Adult versus juvenile contrasts ####
-  
-  life_stage_contrasts <- emmeans::contrast(
-    stage_emm,
-    method = list(
-      "Adult / Juvenile" = c(-1, 1)),
-    by = c("type", "pair")) %>%
-    summary(
-      infer = c(TRUE, TRUE),
-      adjust = "none") %>%
-    as_tibble()
-  
-  cat("\n### Adult versus juvenile counts ###\n")
-  print(life_stage_contrasts)
-  
-  
-  #### 4.10 Pair-specific life-stage composition ####
-  
-  stage_grid_pair <- emmeans::emmeans(
-    juvenile_final,
-    ~life_stage * type | pair)
-  
-  proportion_contrasts_pair <- emmeans::contrast(
-    stage_grid_pair,
-    interaction = c(
-      "revpairwise",
-      "revpairwise"),
-    by = "pair") %>%
-    summary(
-      infer = c(TRUE, TRUE),
-      type = "response",
-      adjust = "none") %>%
-    as_tibble()
-  
-  cat("\n### Reef differences in life-stage balance by pair ###\n")
-  print(proportion_contrasts_pair)
-  
-  
-  #### 4.11 Overall life-stage composition ####
-  
-  stage_grid_overall <- emmeans::emmeans(
-    juvenile_final,
-    ~life_stage * type)
-  
-  proportion_contrast_overall <- emmeans::contrast(
-    stage_grid_overall,
-    interaction = c(
-      "revpairwise",
-      "revpairwise")) %>%
-    summary(
-      infer = c(TRUE, TRUE),
-      type = "response",
-      adjust = "none") %>%
-    as_tibble()
-  
-  cat("\n### Overall reef difference in life-stage balance ###\n")
-  print(proportion_contrast_overall)
-  
-  
-  #### 4.12 Return outputs ####
+      juvenile_proportion = juvenile / (juvenile + adult)
+    )
   
   list(
-    data = juvenile_data,
-    model = juvenile_final,
-    distribution_comparison =
-      distribution_comparison,
-    candidate_comparison =
-      candidate_comparison,
-    diagnostics = diagnostic_tests,
-    tests = stage_tests,
-    predictions = stage_predictions,
-    proportions = stage_proportions,
-    reef_contrasts = stage_contrasts,
-    stage_contrasts =
-      life_stage_contrasts,
-    pair_composition =
-      proportion_contrasts_pair,
-    overall_composition =
-      proportion_contrast_overall)
-})
+    omnibus = omnibus,
+    predicted_counts = predicted_counts,
+    reef_contrasts = reef_contrasts,
+    stage_contrasts = stage_contrasts,
+    juvenile_proportions = juvenile_proportions,
+    composition_contrasts = composition_contrasts
+  )
+}
+species_results <- extract_species_results(species_models)
+
+# Access each results table with 
+species_results$omnibus
+species_results$predicted_counts
+species_results$reef_contrasts
+species_results$stage_contrasts
+species_results$juvenile_proportions
+species_results$composition_contrasts
 
 
-#### 4.13 Save outputs ####
+### plotting ###
+library(dplyr)
+library(ggplot2)
+library(purrr)
+library(cowplot)
 
-juvenile_data <- juvenile_results$data
-juvenile_final <- juvenile_results$model
 
-juvenile_distribution_comparison <-
-  juvenile_results$distribution_comparison
+composition_sig <- species_results$composition_contrasts %>%
+  transmute(
+    Sci_Name = recode(as.character(Species), !!!species_labels),
+    pair,
+    significant = p.value < 0.05
+  )
 
-juvenile_candidate_comparison <-
-  juvenile_results$candidate_comparison
+plot_species_group <- function(
+    species_names,
+    raw_data = raw_stage_props,
+    model_data = juvenile_plot_data,
+    sig_data = composition_sig
+) {
+  
+  raw_plot <- raw_data %>%
+    filter(Sci_Name %in% species_names) %>%
+    mutate(
+      Sci_Name = factor(Sci_Name, levels = species_names),
+      pair = factor(pair, levels = pair_levels),
+      type = factor(type, levels = c("Natural", "Artificial"))
+    )
+  
+  model_plot <- model_data %>%
+    filter(Sci_Name %in% species_names) %>%
+    left_join(sig_data, by = c("Sci_Name", "pair")) %>%
+    mutate(
+      Sci_Name = factor(Sci_Name, levels = species_names),
+      pair = factor(pair, levels = pair_levels),
+      type = factor(type, levels = c("Natural", "Artificial"))
+    )
+  
+  sig_plot <- model_plot %>%
+    distinct(Sci_Name, pair, significant) %>%
+    filter(significant)
+  
+  p <- ggplot() +
+    geom_hline(
+      yintercept = 0.5,
+      linetype = 2,
+      linewidth = 0.35,
+      colour = "grey70"
+    ) +
+    
+    ## Raw survey-level proportions
+    geom_jitter(
+      data = raw_plot,
+      aes(x = type, y = raw_juvenile_prop),
+      width = 0.08,
+      height = 0,
+      size = 1,
+      alpha = 0.25,
+      colour = "grey35"
+    ) +
+    
+    ## Modelled NR-to-AR difference
+    geom_line(
+      data = model_plot,
+      aes(
+        x = type,
+        y = juvenile_proportion,
+        group = interaction(Sci_Name, pair)
+      ),
+      linewidth = 0.8,
+      colour = "grey20"
+    ) +
+    geom_point(
+      data = model_plot,
+      aes(
+        x = type,
+        y = juvenile_proportion,
+        fill = type
+      ),
+      shape = 21,
+      size = 2,
+      stroke = 0.7,
+      colour = "black"
+    )
+  
+  ## Add significance markers only when present
+  if (nrow(sig_plot) > 0) {
+    p <- p +
+      geom_text(
+        data = sig_plot,
+        aes(x = 1.5, y = 1.04, label = "*"),
+        inherit.aes = FALSE,
+        size = 5
+      )
+  }
+  
+  p +
+    facet_grid(
+      rows = vars(Sci_Name),
+      cols = vars(pair),
+      drop = FALSE
+    ) +
+    scale_fill_manual(
+      values = reef_cols,
+      guide = "none"
+    ) +
+    scale_x_discrete(
+      labels = c(
+        "Natural" = "NR",
+        "Artificial" = "AR"
+      )
+    ) +
+    scale_y_continuous(
+      limits = c(0, 1.08),
+      breaks = c(0, 0.25, 0.5, 0.75, 1),
+      labels = scales::percent,
+      oob = scales::squish
+    ) +
+    labs(
+      x = NULL,
+      y = "Juvenile proportion"
+    ) +
+    theme_classic(base_family = "Arial") +
+    theme(
+      strip.background = element_blank(),
+      strip.text.x = element_text(
+        face = "bold",
+        size = 10
+      ),
+      strip.text.y = element_text(
+        angle = 0,
+        face = "italic",
+        size = 10
+      ),
+      axis.text.x = element_text(size = 9),
+      axis.title.y = element_text(
+        margin = margin(r = 10)
+      ),
+      panel.spacing.x = unit(0.8, "lines"),
+      panel.spacing.y = unit(0.7, "lines"),
+      plot.margin = margin(5, 5, 5, 10)
+    )
+}
 
-juvenile_diagnostics <-
-  juvenile_results$diagnostics
+fig_snappers_stage <- plot_species_group(
+  c(
+    "Lutjanus russellii",
+    "Lutjanus vitta",
+    "Lutjanus argentimaculatus"
+  )
+)
 
-juvenile_tests <-
-  juvenile_results$tests
+fig_damsels_stage <- plot_species_group(
+  c(
+    "Neopomacentrus cyanomos",
+    "Pomacentrus alexanderae"
+  )
+)
 
-stage_predictions <-
-  juvenile_results$predictions
+fig_snappers_stage
+fig_damsels_stage
 
-stage_proportions <-
-  juvenile_results$proportions
 
-stage_contrasts <-
-  juvenile_results$reef_contrasts
+species_order <- c(
+  "Neopomacentrus cyanomos",
+  "Pomacentrus alexanderae",
+  "Lutjanus russellii",
+  "Lutjanus argentimaculatus",
+  "Lutjanus vitta"
+)
 
-life_stage_contrasts <-
-  juvenile_results$stage_contrasts
-
-proportion_contrasts_pair <-
-  juvenile_results$pair_composition
-
-proportion_contrast_overall <-
-  juvenile_results$overall_composition
-
-rm(juvenile_results)
-
-summary(juvenile_final)
+fig_species_stage <- plot_species_group(species_order)

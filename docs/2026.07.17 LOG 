@@ -1,0 +1,20 @@
+LOG 
+
+1039AM FINAL TAXA 
+* had to drop Java Rabbit due to diagnositics
+* Regal Demoiselle is not perfect, issue is specific to residual dispersion and excess zeros. So imperfect residual fit --> not STRONG evidence here but we can temper that in disucssion 
+
+1022AM MODEL STRUCTURES 
+* stage_count ~ life_stage * type * pair + (1 | survey_id) 
+* directly tests if juv and adult counts differ btwn reef types, and if that pattern varies among pairs 
+
+956AM STARTING SPP SPECIFIC ANALYSES 
+* first choice: target taxa
+  * both damselfish species 
+  * snappers (try all 3)
+  * java rabbitfish
+* main concern is cell-level sparsity, especially:
+** Brownstripe snapper: only 12 juvenile-positive surveys and 78.1% zeros.
+** Java rabbitfish: adults occur in only 17 surveys.
+** Alexander’s damselfish: adults occur in only 23 surveys.
+** Regal demoiselle, Russell’s snapper, and mangrove snapper look strongest overall.
