@@ -11,4 +11,4 @@ data/processed/*.rds
 
 outputs/
 *.html
-*.log
+*.logdocs/
