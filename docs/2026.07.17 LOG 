@@ -1,20 +1,120 @@
-LOG 
+LATE AFTERNOON METHODS REVISION
+* Decided all data preparation, life-stage assignment, and exploratory checks belong in Section 2.3.
+* All model descriptions will be consolidated under Section 2.4 Statistical Analyses.
+* Section 2.4 will use subheadings for:
+  * abundance trajectories
+  * Shannon diversity
+  * community life-stage structure
+  * species-specific life-stage patterns
+* No analyses will be deferred to Supplementary Methods.
+* Methods will include only manuscript-relevant cleaning decisions rather than every coding step.
+* Package citations will be included for R, tidyverse, glmmTMB, mgcv, vegan, DHARMa, and emmeans.
+* Data preparation and figures will be described as using the tidyverse, including ggplot2.
+* Clarified random-effect rationale:
+  * abundance survey random intercept accounts for non-independence of feeding-guild counts from the same survey
+  * life-stage survey random intercept additionally accounts for juvenile and adult counts derived from the same underlying observations
 
-1039AM FINAL TAXA 
-* had to drop Java Rabbit due to diagnositics
-* Regal Demoiselle is not perfect, issue is specific to residual dispersion and excess zeros. So imperfect residual fit --> not STRONG evidence here but we can temper that in disucssion 
+LATE AFTERNOON README
+* Merged the former attractor and producer README files into one GitHub README.
+* Updated repository scope, script structure, final models, focal taxa, output folders, and terminology.
+* Removed the obsolete split between separate attractor and producer repositories.
+* Clarified that the study assesses evidence consistent with attraction, redistribution, recruitment, and juvenile enrichment, but does not directly measure new biomass production.
 
-1022AM MODEL STRUCTURES 
-* stage_count ~ life_stage * type * pair + (1 | survey_id) 
-* directly tests if juv and adult counts differ btwn reef types, and if that pattern varies among pairs 
+AFTERNOON MODEL, RESULTS, AND PLOT RESTRUCTURING
+* Reorganised scripts so:
+  * 04_MODELS.R fits models, runs diagnostics, and performs sensitivity analyses
+  * 05_RESULTS.R contains all emmeans, emtrends, omnibus tests, contrasts, and result tables
+  * 06_PLOTS.R creates final manuscript figures
+* Corrected dependency order so Results runs before Plots.
+* Kept the GAMM analysis as a sensitivity test only.
+* Retained the GLMM as the final abundance model because the GAMM did not improve temporal holdout prediction.
+* Final model objects are not automatically saved unless needed, but model summaries and diagnostics are exported.
 
-956AM STARTING SPP SPECIFIC ANALYSES 
-* first choice: target taxa
-  * both damselfish species 
-  * snappers (try all 3)
-  * java rabbitfish
-* main concern is cell-level sparsity, especially:
-** Brownstripe snapper: only 12 juvenile-positive surveys and 78.1% zeros.
-** Java rabbitfish: adults occur in only 17 surveys.
-** Alexander’s damselfish: adults occur in only 23 surveys.
-** Regal demoiselle, Russell’s snapper, and mangrove snapper look strongest overall.
+AFTERNOON EFFORT AND EXPLORATION
+* Cleaned 02_EFFORT.R and saved only publication-relevant effort summaries.
+* Corrected life-stage means and SDs so they are based on survey-level stage totals rather than size-bin rows.
+* Cleaned 03_EXPLORE.R.
+* Retained structural, zero-representation, temporal-support, collinearity, variance, outlier, diversity, and size-support checks.
+* Changed temporal autocorrelation correction from BH to Holm.
+* Moved raw extreme-survey verification into 99_scratch.R.
+
+AFTERNOON DATA CLEANING
+* Condensed both cleaning scripts and removed repeated package calls.
+* Abundance cleaning:
+  * restricted data to July 2023 through November 2025
+  * averaged same-date, same-site observer rows to one survey estimate
+  * retained one survey-level row per species before guild aggregation
+  * excluded eels and rays after exploration because of extreme sparsity
+* Size cleaning:
+  * corrected visibility filtering so surveys with visibility below 3 m are excluded rather than treated as missing
+  * retained probabilistic juvenile and adult allocation while preserving total counts
+  * used shared site, pair, reef-type, guild, and life-stage levels
+* Fixed coding issues caused by date-column sanitisation and lubridate month calculations.
+
+EARLY AFTERNOON CODE RESTRUCTURING
+* Standardised repository workflow:
+  * 00_SETUP.R
+  * 01A_CLEAN_abund.R
+  * 01B_CLEAN_size.R
+  * 02_EFFORT.R
+  * 03_EXPLORE.R
+  * 04_MODELS.R
+  * 05_RESULTS.R
+  * 06_PLOTS.R
+  * 99_scratch.R
+* Moved all package loading, shared levels, paths, palettes, and helper functions into 00_SETUP.R.
+* Confirmed output structure uses dated folders:
+  * outputs/Analysis_YYYY.MM.DD/figures
+  * outputs/Analysis_YYYY.MM.DD/tables
+  * outputs/Analysis_YYYY.MM.DD/diagnostics
+  * outputs/Analysis_YYYY.MM.DD/model_objects
+  * outputs/Analysis_YYYY.MM.DD/exploration
+* Decided to save only cleaned datasets, final summaries, diagnostics, and manuscript figures rather than every intermediate object.
+
+LATE MORNING SPECIES-SPECIFIC RESULTS
+* Finalised Section 3.5 structure around five focal taxa:
+  * Neopomacentrus cyanomos
+  * Pomacentrus alexanderae
+  * Lutjanus russellii
+  * Lutjanus vitta
+  * Lutjanus argentimaculatus
+* Damselfishes were strongly juvenile-dominated across reef types and pairs.
+* Lutjanus vitta was the only species with a significant reef-type difference in juvenile-to-adult composition that varied among pairs.
+* At Sattakut, the artificial reef had a significantly lower juvenile-to-adult ratio than the natural reef, driven by high adult abundance.
+* Removed unnecessary predicted-count details from the manuscript text.
+* Retained a caution that Neopomacentrus cyanomos showed imperfect residual fit and that some Lutjanus argentimaculatus natural-reef estimates approached zero.
+
+LATE MORNING COMMUNITY LIFE-STAGE RESULTS
+* Finalised Section 3.4 reporting structure.
+* Clarified that two apparently repetitive contrasts answer different questions:
+  * juvenile versus adult abundance within each reef
+  * artificial versus natural differences within each life stage
+* Retained omnibus Wald tests for interaction terms and pair-specific emmeans contrasts for interpretation.
+* Final community model remained:
+  * stage_count ~ life_stage * type * pair + (1 | Species) + (1 | survey_id)
+  * nbinom2
+  * dispformula = ~type
+* Survey random intercept accounts for clustering of species-stage observations within surveys and the non-independence of juvenile and adult counts partitioned from the same observations.
+* Species random intercept controls for large baseline abundance differences among taxa.
+* Decided not to report tiny predicted counts in the Lutjanus vitta results because they were distracting and implied unnecessary precision.
+
+1039AM FINAL TAXA
+* Had to drop Java rabbitfish due to diagnostics.
+* Regal demoiselle is not perfect because the issue is specific to residual dispersion and excess zeros.
+* Residual fit is imperfect for Regal demoiselle, so this should not be treated as strong evidence and will be tempered in the Discussion.
+
+1022AM MODEL STRUCTURES
+* Final species-specific model:
+  * stage_count ~ life_stage * type * pair + (1 | survey_id)
+* This directly tests whether juvenile and adult counts differ between reef types and whether that pattern varies among pairs.
+
+956AM STARTING SPECIES-SPECIFIC ANALYSES
+* Initial target taxa:
+  * both damselfish species
+  * all three snappers
+  * Java rabbitfish
+* Main concern was cell-level sparsity, especially:
+  * Brownstripe snapper had only 12 juvenile-positive surveys and 78.1% zeroes.
+  * Java rabbitfish adults occurred in only 17 surveys.
+  * Alexander’s damselfish adults occurred in only 23 surveys.
+  * Regal demoiselle, Russell’s snapper, and mangrove snapper appeared strongest overall.

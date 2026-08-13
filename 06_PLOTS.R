@@ -25,13 +25,7 @@ predict_count_model <- function(model, newdata) {
 }
 
 
-#### 2. Figure 3: abundance trajectories ####
-
-total_predictions <- total_abundance_data %>%
-  group_by(pair, type) %>%
-  reframe(Date = seq(min(Date), max(Date), length.out = 100)) %>%
-  mutate(date_s = to_date_s(Date)) %>%
-  predict_count_model(total_abundance_final, newdata = .)
+#### 2. Figure 3: feeding-guild abundance trajectories ####
 
 guild_grid <- abundance_data %>%
   group_by(pair, type, feeding_guild) %>%
@@ -43,23 +37,25 @@ guild_grid <- abundance_data %>%
 
 guild_predictions <- predict_count_model(abundance_final, guild_grid)
 
-fig3_total <- ggplot(total_predictions, aes(Date, predicted, colour = type, fill = type)) +
-  geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.18, colour = NA) +
-  geom_line(linewidth = 1) +
-  facet_wrap(~pair, nrow = 1) +
-  scale_colour_manual(values = reef_cols) +
-  scale_fill_manual(values = reef_cols) +
-  labs(x = NULL, y = "Predicted total abundance", colour = "Reef type", fill = "Reef type") +
-  theme_clean +
-  theme(legend.position = "none", strip.text = element_text(size = 11))
-
-fig3_guild <- ggplot(guild_predictions, aes(Date, predicted, colour = type, fill = type)) +
+fig3_abundance <- ggplot(guild_predictions, aes(Date, predicted, colour = type, fill = type)) +
+  geom_vline(
+    data = deployment_lookup %>% filter(!is.na(deployment_date)),
+    aes(xintercept = deployment_date),
+    linetype = 2,
+    colour = "grey40",
+    inherit.aes = FALSE
+  ) +
   geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.18, colour = NA) +
   geom_line(linewidth = 1) +
   facet_grid(pair ~ feeding_guild, scales = "free_y", switch = "y") +
   scale_colour_manual(values = reef_cols) +
   scale_fill_manual(values = reef_cols) +
-  labs(x = "Date", y = "Predicted feeding-guild abundance", colour = "Reef type", fill = "Reef type") +
+  labs(
+    x = "Date",
+    y = "Predicted feeding-guild abundance",
+    colour = "Reef type",
+    fill = "Reef type"
+  ) +
   theme_clean +
   theme(
     strip.placement = "outside",
@@ -67,16 +63,11 @@ fig3_guild <- ggplot(guild_predictions, aes(Date, predicted, colour = type, fill
     legend.position = "bottom"
   )
 
-fig3_abundance <- fig3_total / fig3_guild +
-  plot_layout(heights = c(0.65, 2), guides = "collect") +
-  plot_annotation(tag_levels = "a") &
-  theme(legend.position = "bottom")
-
 ggsave(
   file.path(figures_dir, "Fig3_Abundance.png"),
-  fig3_abundance, width = 13, height = 5.5, dpi = 600, bg = "white"
-)
-
+  fig3_abundance,
+  width = 11,  height = 6.5, dpi = 600, bg = "white")
+fig3_abundance
 
 #### 3. Figure 4: Shannon diversity ####
 
@@ -111,7 +102,7 @@ fig4a_diversity <- ggplot() +
   ) +
   geom_point(
     data = diversity_data, aes(Date, shannon, colour = type),
-    alpha = 0.45, size = 1.8, position = position_jitter(width = 8, height = 0)
+    alpha = 0.45, size = 1, position = position_jitter(width = 8, height = 0)
   ) +
   geom_ribbon(
     data = diversity_predictions, aes(Date, ymin = lower, ymax = upper, fill = type),
@@ -130,7 +121,7 @@ fig4a_diversity <- ggplot() +
 
 fig4b_diversity <- ggplot(diversity_data, aes(type, shannon, colour = type)) +
   geom_boxplot(width = 0.62, linewidth = 0.8, outlier.shape = NA) +
-  geom_jitter(width = 0.14, height = 0, alpha = 0.5, size = 1.6) +
+  geom_jitter(width = 0.14, height = 0, alpha = 0.5, size = 0.6) +
   scale_colour_manual(values = reef_cols) +
   labs(x = "Reef type", y = "Shannon diversity") +
   theme_clean +
@@ -148,7 +139,7 @@ ggsave(
   fig4_diversity, width = 13, height = 5.5, dpi = 600, bg = "white"
 )
 
-
+fig4_diversity
 #### 4. Figure 5: community juvenile-adult balance ####
 
 stage_balance_plot <- life_stage_contrasts %>%
@@ -219,10 +210,10 @@ fig5_juvenile_balance <- ggplot() +
 
 ggsave(
   file.path(figures_dir, "Fig5_Juvenile_balance.png"),
-  fig5_juvenile_balance, width = 8, height = 4.8, dpi = 600, bg = "white"
+  fig5_juvenile_balance, width = 8, height = 8, dpi = 600, bg = "white"
 )
 
-
+fig5_juvenile_balance
 #### 5. Figure 6: species-specific juvenile proportions ####
 
 species_order <- c(
@@ -347,5 +338,6 @@ ggsave(
   file.path(figures_dir, "Fig6_Species_juvenile_proportions.png"),
   fig6_species_stage, width = 10, height = 10, dpi = 600, bg = "white"
 )
+fig6_species_stage
 
 message("Saved final figures to: ", figures_dir)

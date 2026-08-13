@@ -152,3 +152,23 @@ effort_summaries$abundance_effort
 effort_summaries$abundance_effort_2025
 effort_summaries$size_dataset_summary
 effort_summaries$size_effort
+
+# how many surveys before deployment 
+effort_summaries$abundance_effort %>%
+  filter(period == "Pre")
+
+effort_summaries$abundance_effort %>%
+  filter(period == "Pre") %>%
+  summarise(n_surveys = sum(n_surveys))
+
+# first survey after deployment 
+fish_long %>%
+  distinct(survey_id, site, pair, type, Date) %>%
+  filter(
+    pair %in% c("Aow Mao", "No Name"),
+    Date > as.Date("2023-08-31")
+  ) %>%
+  group_by(pair, type) %>%
+  slice_min(Date, with_ties = FALSE) %>%
+  mutate(days_after_deployment = as.numeric(Date - as.Date("2023-09-01"))) %>%
+  arrange(pair, type)

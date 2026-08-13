@@ -142,3 +142,13 @@ source("size-fixes/B_size-bin-fix.R")
 
 writeLines(capture.output(sessionInfo()), file.path(diagnostics_dir, paste0("session_info_", analysis_date, ".txt")))
 message("Setup complete.")
+
+
+### sourcing files 
+source("~/Documents/1_GLOBAL REEF/0_PROJECTS/AR_Producer_Attractor/AR-attractor-producer/01A_CLEAN_abund.R")
+source("~/Documents/1_GLOBAL REEF/0_PROJECTS/AR_Producer_Attractor/AR-attractor-producer/01B_CLEAN_size.R")
+source("~/Documents/1_GLOBAL REEF/0_PROJECTS/AR_Producer_Attractor/AR-attractor-producer/02_EFFORT.R")
+source("~/Documents/1_GLOBAL REEF/0_PROJECTS/AR_Producer_Attractor/AR-attractor-producer/03_EXPLORE.R")
+source("~/Documents/1_GLOBAL REEF/0_PROJECTS/AR_Producer_Attractor/AR-attractor-producer/04_MODELS.R")
+source("~/Documents/1_GLOBAL REEF/0_PROJECTS/AR_Producer_Attractor/AR-attractor-producer/05_RESULTS.R")
+source("~/Documents/1_GLOBAL REEF/0_PROJECTS/AR_Producer_Attractor/AR-attractor-producer/06_PLOTS.R")
